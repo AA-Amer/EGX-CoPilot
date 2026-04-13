@@ -1,0 +1,40 @@
+{
+  "wallets": {
+    "long_term_pct": 60,
+    "swing_pct": 30,
+    "cash_pct": 10
+  },
+  "swing": {
+    "signal_min_score": 70,
+    "min_trade_egp": 2000,
+    "max_positions": 3,
+    "step_target_pct": 3.5,
+    "stop_loss_pct": 2.5,
+    "min_rr_ratio": 1.2,
+    "monthly_target_pct": 10,
+    "max_combined_loss_pct": 5,
+    "sector_cap": 2,
+    "signal_time_eet": "17:30",
+    "recheck_time_eet": "09:45"
+  },
+  "long_term": {
+    "max_single_stock_pct": 20,
+    "max_sector_pct": 40,
+    "annual_target_pct": 25,
+    "min_holding_days": 180
+  },
+  "shariah": {
+    "debt_to_assets_max": 0.33,
+    "interest_income_max": 0.05,
+    "receivables_to_assets_max": 0.49
+  },
+  "data": {
+    "price_delay_minutes": 15,
+    "default_period": "6mo",
+    "default_interval": "1d"
+  },
+  "ai": {
+    "model": "claude-sonnet-4-5",
+    "max_tokens": 4096
+  }
+}
