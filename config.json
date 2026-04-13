@@ -1,5 +1,6 @@
 {
   "wallets": {
+    "total_capital_egp": 200000,
     "long_term_pct": 60,
     "swing_pct": 30,
     "cash_pct": 10
@@ -14,6 +15,7 @@
     "monthly_target_pct": 10,
     "max_combined_loss_pct": 5,
     "sector_cap": 2,
+    "allocation_mode": "score_weighted",
     "signal_time_eet": "17:30",
     "recheck_time_eet": "09:45"
   },
@@ -24,17 +26,66 @@
     "min_holding_days": 180
   },
   "shariah": {
+    "enabled": true,
     "debt_to_assets_max": 0.33,
     "interest_income_max": 0.05,
     "receivables_to_assets_max": 0.49
+  },
+  "tickers": {
+    "universe": ["SWDY", "ORWE", "MNHD", "ETEL", "AMOC", "OTMT", "CLHO"],
+    "long_term": ["ETEL", "CLHO", "AMOC"],
+    "swing": ["SWDY", "ORWE", "MNHD"],
+    "both": ["OTMT"]
   },
   "data": {
     "price_delay_minutes": 15,
     "default_period": "6mo",
     "default_interval": "1d"
   },
+  "toggles": {
+    "shariah_filter": true,
+    "t2_enforcement": true,
+    "morning_scan_notify": true,
+    "stop_loss_hard_block": true,
+    "sector_correlation_check": true,
+    "cbe_event_blackout": true
+  },
   "ai": {
-    "model": "claude-sonnet-4-5",
-    "max_tokens": 4096
+    "active_provider": "groq",
+    "providers": {
+      "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "model": "llama-3.1-70b-versatile",
+        "enabled": true
+      },
+      "ollama": {
+        "base_url": "http://localhost:11434",
+        "model": "llama3.1:8b",
+        "enabled": true,
+        "use_when": "groq_unavailable"
+      },
+      "gemini": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.0-flash",
+        "enabled": true,
+        "use_when": "groq_unavailable"
+      },
+      "claude": {
+        "base_url": "https://api.anthropic.com",
+        "model": "claude-sonnet-4-6",
+        "enabled": false,
+        "use_when": "manual_activation"
+      }
+    },
+    "task_routing": {
+      "news_analysis": "groq",
+      "arabic_sentiment": "groq",
+      "signal_scoring": "groq",
+      "structured_extraction": "groq",
+      "simple_chat": "ollama",
+      "portfolio_summary": "groq"
+    },
+    "max_tokens": 4096,
+    "temperature": 0.1
   }
 }
