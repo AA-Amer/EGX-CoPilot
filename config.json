@@ -1,6 +1,6 @@
 {
   "wallets": {
-    "total_capital_egp": 200000,
+    "total_capital_egp": 100000,
     "long_term_pct": 60,
     "swing_pct": 30,
     "cash_pct": 10
@@ -32,10 +32,29 @@
     "receivables_to_assets_max": 0.49
   },
   "tickers": {
-    "universe": ["SWDY", "ORWE", "MNHD", "ETEL", "AMOC", "OTMT", "CLHO"],
-    "long_term": ["ETEL", "CLHO", "AMOC"],
-    "swing": ["SWDY", "ORWE", "MNHD"],
-    "both": ["OTMT"]
+    "universe": [
+      "ORAS",
+      "ORWE",
+      "AMOC",
+      "MICH",
+      "OLFI",
+      "MPCI",
+      "SWDY",
+      "SUGR"
+    ],
+    "long_term": [
+      "ORAS",
+      "AMOC"
+    ],
+    "swing": [
+      "ORWE",
+      "MICH",
+      "OLFI",
+      "MPCI",
+      "SWDY",
+      "SUGR"
+    ],
+    "both": []
   },
   "data": {
     "price_delay_minutes": 15,
@@ -55,7 +74,7 @@
     "providers": {
       "groq": {
         "base_url": "https://api.groq.com/openai/v1",
-        "model": "llama-3.1-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "enabled": true
       },
       "ollama": {
@@ -82,7 +101,7 @@
       "arabic_sentiment": "groq",
       "signal_scoring": "groq",
       "structured_extraction": "groq",
-      "simple_chat": "ollama",
+      "simple_chat": "groq",
       "portfolio_summary": "groq"
     },
     "max_tokens": 4096,
