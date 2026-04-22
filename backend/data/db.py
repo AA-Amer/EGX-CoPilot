@@ -27,7 +27,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-_DB_DEFAULT = "D:/SQLLite/egx_copilot.db"
+_DB_DEFAULT = "data\egx_copilot.db"
 
 
 def _db_path() -> str:
@@ -104,12 +104,149 @@ CREATE TABLE IF NOT EXISTS manual_prices (
 );
 """
 
+_DDL_LT_TRANSACTIONS = """
+CREATE TABLE IF NOT EXISTS lt_transactions (
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    date                     DATE    NOT NULL,
+    category                 TEXT    NOT NULL,
+    ticker                   TEXT,
+    quantity                 REAL,
+    fulfillment_price        REAL,
+    fees                     REAL    DEFAULT 0,
+    dividend_tax             REAL    DEFAULT 0,
+    actual_price_per_share   REAL,
+    total_amount             REAL,
+    year                     INTEGER,
+    quarter                  TEXT,
+    fx_rate                  REAL,
+    usd_value                REAL,
+    net_wallet_impact        REAL,
+    external_capital_impact  REAL,
+    notes                    TEXT
+);
+"""
+
+_DDL_LT_POSITIONS = """
+CREATE TABLE IF NOT EXISTS lt_positions (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker            TEXT    UNIQUE NOT NULL,
+    total_shares      REAL    DEFAULT 0,
+    total_cost_net    REAL    DEFAULT 0,
+    weighted_avg_cost REAL    DEFAULT 0,
+    realized_pl       REAL    DEFAULT 0,
+    dividends_net     REAL    DEFAULT 0,
+    status            TEXT    DEFAULT 'Open',
+    last_updated      DATE
+);
+"""
+
+_DDL_LT_SIGNALS = """
+CREATE TABLE IF NOT EXISTS lt_signals (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_date                DATE    NOT NULL,
+    ticker                  TEXT    NOT NULL,
+    avg_cost                REAL,
+    price                   REAL,
+    signal                  TEXT,
+    action                  TEXT,
+    score                   INTEGER,
+    position_size_pct       REAL,
+    current_allocation_pct  REAL,
+    recommended_shares      INTEGER,
+    recommended_capital     REAL,
+    suggested_buy_price     REAL,
+    profit_pct              REAL,
+    sell_price              REAL,
+    fib_zone                TEXT,
+    swing_high              REAL,
+    swing_low               REAL,
+    target_1m               REAL,
+    target_6m               REAL,
+    target_12m              REAL,
+    exp_return_1m           REAL,
+    exp_return_6m           REAL,
+    exp_return_12m          REAL,
+    forecast_confidence     TEXT,
+    description             TEXT,
+    deploy_pct              REAL DEFAULT 0,
+    deploy_label            TEXT,
+    deploy_note             TEXT,
+    UNIQUE(run_date, ticker)
+);
+"""
+
+_DDL_LT_PURIFICATION = """
+CREATE TABLE IF NOT EXISTS lt_purification (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker               TEXT    NOT NULL,
+    year                 INTEGER,
+    quarter              TEXT,
+    quarter_start        DATE,
+    quarter_end          DATE,
+    daily_haram_rate     REAL,
+    share_days           REAL,
+    purification_amount  REAL,
+    purification_rounded REAL,
+    status               TEXT,
+    paid_amount          REAL    DEFAULT 0,
+    outstanding          REAL    DEFAULT 0,
+    quarter_closed       TEXT    DEFAULT 'N',
+    UNIQUE(ticker, year, quarter)
+);
+"""
+
+_DDL_INFLATION_DATA = """
+CREATE TABLE IF NOT EXISTS inflation_data (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    month_year       TEXT    UNIQUE NOT NULL,
+    headline_mom     REAL,
+    cumulative_index REAL,
+    cumulative_pct   REAL
+);
+"""
+
 _initialized = False   # module-level flag: persists across Streamlit reruns
+
+
+def init_lt_tables() -> None:
+    """
+    Create all 5 Long-Term Wallet tables if they do not already exist.
+    Safe to call repeatedly — uses CREATE TABLE IF NOT EXISTS throughout.
+    """
+    conn = get_connection()
+    try:
+        conn.executescript(_DDL_LT_TRANSACTIONS)
+        conn.executescript(_DDL_LT_POSITIONS)
+        conn.executescript(_DDL_LT_SIGNALS)
+        conn.executescript(_DDL_LT_PURIFICATION)
+        conn.executescript(_DDL_INFLATION_DATA)
+        conn.commit()
+        logger.info("init_lt_tables: LT schema ready at %s", _db_path())
+    finally:
+        conn.close()
+
+    # Migrate lt_signals: add columns if they don't exist yet
+    conn = get_connection()
+    try:
+        for col, typedef in [
+            ("deploy_pct",    "REAL DEFAULT 0"),
+            ("deploy_label",  "TEXT"),
+            ("deploy_note",   "TEXT"),
+            ("deploy_tier",   "TEXT"),
+            ("enhanced_json", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE lt_signals ADD COLUMN {col} {typedef}")
+                conn.commit()
+            except Exception:
+                pass  # column already exists
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
     """
-    Create all 4 tables if they do not already exist.
+    Create all tables (core + LT wallet) if they do not already exist.
     Safe to call repeatedly — uses CREATE TABLE IF NOT EXISTS throughout.
     """
     global _initialized
@@ -122,11 +259,44 @@ def init_db() -> None:
         conn.executescript(_DDL_COLLECTION_LOG)
         conn.executescript(_DDL_POSITIONS)
         conn.executescript(_DDL_MANUAL_PRICES)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS watchlist (
+                ticker          TEXT PRIMARY KEY,
+                name            TEXT NOT NULL,
+                yahoo_code      TEXT,
+                sector          TEXT,
+                market          TEXT DEFAULT 'EGX',
+                shariah         INTEGER DEFAULT 1,
+                active          INTEGER DEFAULT 1,
+                notes           TEXT,
+                added_at        TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
+        conn.executemany("""
+            INSERT OR IGNORE INTO watchlist
+            (ticker, name, yahoo_code, sector, market, shariah, active)
+            VALUES (?,?,?,?,?,?,?)
+        """, [
+            ('MPCI', 'Misr Phosphate',           'MPCI.CA', 'Materials',   'EGX', 1, 1),
+            ('AMOC', 'Alexandria Mineral Oils',  'AMOC.CA', 'Energy',      'EGX', 1, 1),
+            ('ORWE', 'Oriental Weavers',          'ORWE.CA', 'Consumer',    'EGX', 1, 1),
+            ('MICH', 'Misr Chemical Industries', 'MICH.CA', 'Materials',   'EGX', 1, 1),
+            ('ORAS', 'Orascom Construction',      'ORAS.CA', 'Industrials', 'EGX', 1, 1),
+            ('OLFI', 'Olympic Group',             'OLFI.CA', 'Consumer',    'EGX', 1, 1),
+            ('SUGR', 'Delta Sugar',               'SUGR.CA', 'Consumer',    'EGX', 1, 1),
+            ('SWDY', 'Elsewedy Electric',         'SWDY.CA', 'Industrials', 'EGX', 1, 1),
+        ])
+
         conn.commit()
         logger.info("init_db: schema ready at %s", _db_path())
     finally:
         conn.close()
 
+    init_lt_tables()
+    from backend.data.fundamental_db import init_fundamental_tables
+    init_fundamental_tables()
     _initialized = True
 
 
@@ -288,3 +458,41 @@ def get_manual_entries(limit: int = 20) -> pd.DataFrame:
     finally:
         conn.close()
     return df
+
+
+def get_prev_close(ticker: str) -> Optional[float]:
+    """
+    Return the second-most-recent closing price for a ticker (i.e. yesterday's close),
+    or None if fewer than 2 rows exist.
+    """
+    try:
+        conn = get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT close FROM prices WHERE ticker=? ORDER BY date DESC LIMIT 2",
+                (ticker.upper(),),
+            ).fetchall()
+        finally:
+            conn.close()
+        return float(rows[1][0]) if len(rows) >= 2 else None
+    except Exception:
+        return None
+
+
+def get_last_collection_time() -> str:
+    """
+    Return the latest run_at timestamp from collection_log as a string,
+    or an empty string if no collection has been run yet.
+    Used for the auto-refresh polling mechanism.
+    """
+    try:
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT run_at FROM collection_log ORDER BY run_at DESC LIMIT 1"
+            ).fetchone()
+        finally:
+            conn.close()
+        return row[0] if row else ""
+    except Exception:
+        return ""
